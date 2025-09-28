@@ -1,8 +1,8 @@
-# 🎙️ Podcast Summarizer
+# Podcast Summarizer
 
 An automated tool that downloads, transcribes, and generates AI-powered summaries of podcasts with email delivery.
 
-## ✨ Features
+## Features
 
 - **Multi-Platform Support**: Works with YouTube, PocketCasts, Spotify, and direct MP3 URLs
 - **Automatic Transcription**: Uses OpenAI Whisper for high-quality audio-to-text conversion
@@ -12,7 +12,37 @@ An automated tool that downloads, transcribes, and generates AI-powered summarie
 - **Batch Processing**: Handle multiple podcast files at once
 - **Founder Insights**: Extracts specific insights valuable for entrepreneurs
 
-## 🚀 Quick Start
+## Usage
+
+### Basic Commands
+
+```bash
+# Process a podcast URL
+python3 podcast_summarizer.py "https://www.youtube.com/watch?v=..."
+
+# Process without email
+python3 podcast_summarizer.py "https://pca.st/episode/..." --no-email
+
+# Process existing MP3
+python3 podcast_summarizer.py --mp3 podcast.mp3
+
+# Batch process all MP3s in audio_files/
+python3 process_existing.py --all
+
+# Enable verbose output
+python3 podcast_summarizer.py --verbose "url"
+```
+
+### Supported Platforms
+
+| Platform | Transcript | Audio | Notes |
+|----------|------------|-------|-------|
+| YouTube | Native | Yes | Auto-fetches captions when available |
+| PocketCasts | No | Yes | Direct MP3 extraction |
+| Spotify | No | Yes | Via yt-dlp |
+| Direct MP3 | No | Yes | Any MP3 URL |
+
+## Installation
 
 ### Prerequisites
 
@@ -20,12 +50,12 @@ An automated tool that downloads, transcribes, and generates AI-powered summarie
 - [Claude Desktop App](https://claude.ai) (for AI summaries)
 - FFmpeg (for audio processing)
 
-### Installation
+### Quick Setup
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/podcast-summarizer.git
-cd podcast-summarizer
+git clone https://github.com/mattarderne/podcast.git
+cd podcast
 
 # Run setup script
 ./setup.sh
@@ -53,37 +83,7 @@ For Gmail users:
 - Install [Claude Desktop](https://claude.ai)
 - The tool will automatically detect and use it
 
-## 📖 Usage
-
-### Basic Commands
-
-```bash
-# Process a podcast URL
-python3 podcast_summarizer.py "https://www.youtube.com/watch?v=..."
-
-# Process without email
-python3 podcast_summarizer.py "https://pca.st/episode/..." --no-email
-
-# Process existing MP3
-python3 podcast_summarizer.py --mp3 podcast.mp3
-
-# Batch process all MP3s in audio_files/
-python3 process_existing.py --all
-
-# Enable verbose output
-python3 podcast_summarizer.py --verbose "url"
-```
-
-### Supported Platforms
-
-| Platform | Transcript | Audio | Notes |
-|----------|------------|-------|-------|
-| YouTube | ✅ Native | ✅ | Auto-fetches captions when available |
-| PocketCasts | ❌ | ✅ | Direct MP3 extraction |
-| Spotify | ❌ | ✅ | Via yt-dlp |
-| Direct MP3 | ❌ | ✅ | Any MP3 URL |
-
-## 📊 Summary Format
+## Summary Format
 
 Each summary includes:
 
@@ -96,10 +96,10 @@ Each summary includes:
 - **Insight Rating**: Usefulness, novelty, and depth scores (1-10)
 - **Topics**: Hashtags for categorization
 
-## 📁 File Organization
+## File Organization
 
 ```
-podcast-summarizer/
+podcast/
 ├── podcast_summarizer.py       # Main script
 ├── process_existing.py         # Batch processing
 ├── setup.sh                    # Installation script
@@ -118,7 +118,7 @@ Files are organized with consistent IDs:
 - Example: `pca_6c0eb0b1_20250928`
 - Makes it easy to find related audio, transcript, and summary files
 
-## 🛠️ Advanced Features
+## Advanced Features
 
 ### Batch Processing
 
@@ -144,7 +144,7 @@ When configured, emails include:
 - **Transcript Limit**: 50,000 characters sent to Claude
 - **Storage**: ~30MB per podcast (audio + transcript + summary)
 
-## 🐛 Troubleshooting
+## Troubleshooting
 
 **Claude not found**:
 - Install Claude Desktop from [claude.ai](https://claude.ai)
@@ -160,7 +160,7 @@ When configured, emails include:
 - First run downloads Whisper model (~1GB)
 - Transcription speed depends on CPU
 
-## 🤝 Contributing
+## Contributing
 
 Contributions welcome! To contribute:
 
@@ -172,16 +172,16 @@ Contributions welcome! To contribute:
    ```
 4. Submit a pull request
 
-## 📄 License
+## License
 
 MIT License - see [LICENSE](LICENSE) file for details.
 
-## 🙏 Acknowledgments
+## Acknowledgments
 
 - [OpenAI Whisper](https://github.com/openai/whisper) for transcription
 - [yt-dlp](https://github.com/yt-dlp/yt-dlp) for media extraction
 - [Anthropic Claude](https://anthropic.com) for AI summaries
 
-## ⚠️ Disclaimer
+## Disclaimer
 
 This tool is for personal use. Respect copyright laws and podcast creators' rights. Only process content you have permission to use.
