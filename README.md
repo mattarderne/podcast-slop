@@ -1,30 +1,18 @@
 # Podcast Summarizer
 
-An intelligent podcast processing tool that creates personalized, actionable summaries tailored to your specific interests and goals.
+CLI podcast summaries sent to email. 
 
 ```bash
 # Simple one-line usage after setup
 podcast "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
 ```
 
-## Key Features
+Uses:
 
-### 🎯 Personalized Summaries
-- **Role-Based Insights**: Summaries adapt to your role (founder, investor, engineer, etc.)
-- **Interest Filtering**: Prioritizes content matching your specific interests
-- **Goal Alignment**: Connects insights to your stated goals
-- **Context Awareness**: Considers your background and current projects
+- [OpenAI Whisper](https://github.com/openai/whisper) for transcription
+- [yt-dlp](https://github.com/yt-dlp/yt-dlp) for media extraction
+- [Anthropic Claude](https://anthropic.com) for AI summaries
 
-### 🔧 Core Capabilities
-- **Multi-Platform Support**: YouTube, PocketCasts, Spotify, and direct MP3s
-- **Automatic Transcription**: OpenAI Whisper for accurate audio-to-text
-- **Two-Stage AI Analysis**:
-  - Comprehensive summary with Claude
-  - Core insight synthesis for quick decision-making
-- **Smart Caching**: Skip redundant processing
-- **Enhanced Email Delivery**: Beautifully formatted, skimmable emails with Google search links
-- **Batch Processing**: Handle multiple podcasts at once
-- **Critical Ratings**: Honest 1-10 ratings (most podcasts score 4-7)
 
 ## Usage
 
@@ -97,7 +85,6 @@ Edit these key sections:
 - **goals**: What you want from podcasts
 - **context**: Brief description of your situation
 
-This makes summaries 10x more valuable by focusing on what matters to YOU.
 
 ## Installation
 
@@ -124,17 +111,6 @@ source ~/.bashrc  # or source ~/.zshrc for macOS
 podcast "https://www.youtube.com/watch?v=..."
 ```
 
-### Manual Installation
-
-```bash
-# Install dependencies
-pip install -r requirements.txt
-mkdir -p audio_files transcripts summaries
-
-# Add alias to your shell (optional but recommended)
-echo 'alias podcast="python3 $(pwd)/podcast_summarizer.py"' >> ~/.bashrc
-source ~/.bashrc
-```
 
 ### Configuration
 
@@ -208,14 +184,6 @@ When configured, emails include:
 - **Body**: Plain-text formatted summary (Gmail-optimized)
 - **Attachment**: Full transcript as .txt file
 
-### Email Format
-
-Emails are optimized for quick skimming with:
-- **Core insight at the top** - One sentence capturing the key value
-- **Useful because section** - Why it matters for YOUR specific context
-- **Spaced list items** - Easy to scan on mobile
-- **Google search links** - Click to research any company/person mentioned
-- **Reordered sections** - Most actionable content first
 
 Example:
 ```
@@ -233,13 +201,6 @@ Example:
   → Search: https://www.google.com/search?q=Tom+Tunguz
 ```
 
-### Performance
-
-- **Whisper Model**: Base model (balanced speed/accuracy)
-- **Processing Time**: ~2-5 minutes for 30-minute podcast
-- **Two-Stage Summary**: Initial summary + core insight synthesis
-- **Transcript Limit**: 50,000 characters sent to Claude
-- **Storage**: ~30MB per podcast (audio + transcript + summary)
 
 ## Troubleshooting
 
@@ -273,11 +234,6 @@ Contributions welcome! To contribute:
 
 MIT License - see [LICENSE](LICENSE) file for details.
 
-## Acknowledgments
-
-- [OpenAI Whisper](https://github.com/openai/whisper) for transcription
-- [yt-dlp](https://github.com/yt-dlp/yt-dlp) for media extraction
-- [Anthropic Claude](https://anthropic.com) for AI summaries
 
 ## Disclaimer
 
