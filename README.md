@@ -2,6 +2,11 @@
 
 An automated tool that downloads, transcribes, and generates AI-powered summaries of podcasts with email delivery.
 
+```bash
+# Simple one-line usage after setup
+podcast "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+```
+
 ## Features
 
 - **Multi-Platform Support**: Works with YouTube, PocketCasts, Spotify, and direct MP3 URLs
@@ -14,10 +19,25 @@ An automated tool that downloads, transcribes, and generates AI-powered summarie
 
 ## Usage
 
-### Basic Commands
+### Quick Start with CLI Alias
+
+After installation, you can use the simple `podcast` command:
 
 ```bash
-# Process a podcast URL
+# Process any podcast URL
+podcast "https://www.youtube.com/watch?v=..."
+
+# Process without email
+podcast "https://pca.st/episode/..." --no-email
+
+# Process existing MP3
+podcast --mp3 podcast.mp3
+```
+
+### Full Command Options
+
+```bash
+# Without alias - using Python directly
 python3 podcast_summarizer.py "https://www.youtube.com/watch?v=..."
 
 # Process without email
@@ -57,12 +77,26 @@ python3 podcast_summarizer.py --verbose "url"
 git clone https://github.com/mattarderne/podcast.git
 cd podcast
 
-# Run setup script
+# Run setup script (this creates the 'podcast' command)
 ./setup.sh
 
-# Or manual installation
+# Activate the alias
+source ~/.bashrc  # or source ~/.zshrc for macOS
+
+# Now you can use the simple command
+podcast "https://www.youtube.com/watch?v=..."
+```
+
+### Manual Installation
+
+```bash
+# Install dependencies
 pip install -r requirements.txt
 mkdir -p audio_files transcripts summaries
+
+# Add alias to your shell (optional but recommended)
+echo 'alias podcast="python3 $(pwd)/podcast_summarizer.py"' >> ~/.bashrc
+source ~/.bashrc
 ```
 
 ### Configuration
