@@ -1,21 +1,30 @@
 # Podcast Summarizer
 
-An automated tool that downloads, transcribes, and generates AI-powered summaries of podcasts with email delivery.
+An intelligent podcast processing tool that creates personalized, actionable summaries tailored to your specific interests and goals.
 
 ```bash
 # Simple one-line usage after setup
 podcast "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
 ```
 
-## Features
+## Key Features
 
-- **Multi-Platform Support**: Works with YouTube, PocketCasts, Spotify, and direct MP3 URLs
-- **Automatic Transcription**: Uses OpenAI Whisper for high-quality audio-to-text conversion
-- **AI Summaries**: Generates comprehensive summaries using Claude API
-- **Smart Caching**: Avoids re-processing with intelligent file detection
-- **Email Delivery**: Sends formatted summaries with transcript attachments
-- **Batch Processing**: Handle multiple podcast files at once
-- **Founder Insights**: Extracts specific insights valuable for entrepreneurs
+### 🎯 Personalized Summaries
+- **Role-Based Insights**: Summaries adapt to your role (founder, investor, engineer, etc.)
+- **Interest Filtering**: Prioritizes content matching your specific interests
+- **Goal Alignment**: Connects insights to your stated goals
+- **Context Awareness**: Considers your background and current projects
+
+### 🔧 Core Capabilities
+- **Multi-Platform Support**: YouTube, PocketCasts, Spotify, and direct MP3s
+- **Automatic Transcription**: OpenAI Whisper for accurate audio-to-text
+- **Two-Stage AI Analysis**:
+  - Comprehensive summary with Claude
+  - Core insight synthesis for quick decision-making
+- **Smart Caching**: Skip redundant processing
+- **Enhanced Email Delivery**: Beautifully formatted, skimmable emails with Google search links
+- **Batch Processing**: Handle multiple podcasts at once
+- **Critical Ratings**: Honest 1-10 ratings (most podcasts score 4-7)
 
 ## Usage
 
@@ -32,6 +41,15 @@ podcast "https://pca.st/episode/..." --no-email
 
 # Process existing MP3
 podcast --mp3 podcast.mp3
+
+# Process existing transcript
+podcast --transcript transcript.txt
+
+# Force regeneration (skip cache)
+podcast "url" --force
+
+# Batch processing
+podcast --batch audio_files/*.mp3
 ```
 
 ### Full Command Options
@@ -61,6 +79,25 @@ python3 podcast_summarizer.py --verbose "url"
 | PocketCasts | No | Yes | Direct MP3 extraction |
 | Spotify | No | Yes | Via yt-dlp |
 | Direct MP3 | No | Yes | Any MP3 URL |
+
+## Configuration
+
+### Personalization (Highly Recommended!)
+
+Copy the example config and customize it with your details:
+
+```bash
+cp podcast_config.example.yaml podcast_config.yaml
+nano podcast_config.yaml
+```
+
+Edit these key sections:
+- **role**: Your role (founder/investor/engineer/etc.)
+- **interests**: Topics you care about
+- **goals**: What you want from podcasts
+- **context**: Brief description of your situation
+
+This makes summaries 10x more valuable by focusing on what matters to YOU.
 
 ## Installation
 
@@ -171,10 +208,36 @@ When configured, emails include:
 - **Body**: Plain-text formatted summary (Gmail-optimized)
 - **Attachment**: Full transcript as .txt file
 
+### Email Format
+
+Emails are optimized for quick skimming with:
+- **Core insight at the top** - One sentence capturing the key value
+- **Useful because section** - Why it matters for YOUR specific context
+- **Spaced list items** - Easy to scan on mobile
+- **Google search links** - Click to research any company/person mentioned
+- **Reordered sections** - Most actionable content first
+
+Example:
+```
+💡 CORE INSIGHT:
+[The single most valuable takeaway]
+
+✅ USEFUL BECAUSE:
+[Why this matters for your specific context]
+
+🎯 MAIN TAKEAWAYS
+[Actionable items with spacing]
+
+🔍 PEOPLE & COMPANIES
+- Tom Tunguz: Partner at Theory Ventures
+  → Search: https://www.google.com/search?q=Tom+Tunguz
+```
+
 ### Performance
 
 - **Whisper Model**: Base model (balanced speed/accuracy)
 - **Processing Time**: ~2-5 minutes for 30-minute podcast
+- **Two-Stage Summary**: Initial summary + core insight synthesis
 - **Transcript Limit**: 50,000 characters sent to Claude
 - **Storage**: ~30MB per podcast (audio + transcript + summary)
 

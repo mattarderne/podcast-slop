@@ -12,6 +12,7 @@ import re
 import smtplib
 import subprocess
 import sys
+import yaml
 from datetime import datetime
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -25,9 +26,8 @@ import requests
 
 # Configure logging
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    datefmt='%H:%M:%S'
+    level=logging.WARNING,
+    format='%(message)s'
 )
 logger = logging.getLogger(__name__)
 
@@ -35,28 +35,165 @@ logger = logging.getLogger(__name__)
 class PodcastProcessor:
     """Main processor for podcast summarization"""
 
-    def __init__(self, base_dir: Path = Path.cwd(), enable_email: bool = True):
+    def __init__(self, base_dir: Path = None, enable_email: bool = True, force_regenerate: bool = False, model: str = None):
         """Initialize with organized directory structure"""
-        self.base_dir = base_dir
-        self.audio_dir = base_dir / "audio_files"
-        self.transcript_dir = base_dir / "transcripts"
-        self.summary_dir = base_dir / "summaries"
+        # Always use script directory as base to ensure consistent file locations
+        self.script_dir = Path(__file__).parent
+        self.base_dir = base_dir if base_dir else self.script_dir
+        self.audio_dir = self.base_dir / "audio_files"
+        self.transcript_dir = self.base_dir / "transcripts"
+        self.summary_dir = self.base_dir / "summaries"
         self.enable_email = enable_email
+        self.force_regenerate = force_regenerate
+        self.model = model
+
+        # Load unified configuration
+        self.config = self.load_unified_config()
 
         # Create directories
         for directory in [self.audio_dir, self.transcript_dir, self.summary_dir]:
             directory.mkdir(exist_ok=True)
 
-        # Claude Code path
-        self.claude_path = Path.home() / '.claude' / 'local' / 'claude'
-        if not self.claude_path.exists():
-            logger.error("Claude Code not found. Please install Claude Code.")
-            sys.exit(1)
+        # Claude Code path - with model selection
+        self.claude_path = self.get_claude_command()
 
         # Load email configuration if enabled
         self.email_config = None
         if self.enable_email:
             self.email_config = self.load_email_config()
+
+    def load_unified_config(self) -> Dict:
+        """Load unified configuration from podcast_config.yaml"""
+        config_path = self.script_dir / 'podcast_config.yaml'
+
+        # Try to load the new unified config
+        if config_path.exists():
+            try:
+                with open(config_path, 'r') as f:
+                    config = yaml.safe_load(f)
+                    print(f"✓ Loaded config for {config.get('profile', {}).get('role', 'user')}")
+                    return config
+            except Exception as e:
+                print(f"Warning: Could not load podcast_config.yaml: {e}")
+
+        # Fallback: Try old config files for backwards compatibility
+        old_config_path = self.script_dir / 'config.yaml'
+        if old_config_path.exists():
+            try:
+                with open(old_config_path, 'r') as f:
+                    old_config = yaml.safe_load(f)
+                    # Convert old format to new format
+                    return {
+                        'profile': {
+                            'role': old_config.get('role', 'general'),
+                            'interests': old_config.get('interests', []),
+                            'goals': old_config.get('goals', []),
+                            'context': old_config.get('context', '')
+                        },
+                        'preferences': old_config.get('preferences', {})
+                    }
+            except:
+                pass
+
+        # Return default config if no files exist
+        return {
+            'profile': {
+                'role': 'general',
+                'interests': [],
+                'goals': [],
+                'context': ''
+            },
+            'preferences': {
+                'critical_rating': True,
+                'emphasis': 'actionable'
+            }
+        }
+
+    def get_claude_command(self) -> Path:
+        """Get Claude command with optional model selection"""
+        base_path = Path.home() / '.claude' / 'local' / 'claude'
+
+        if not base_path.exists():
+            print("Error: Claude Code not found. Please install Claude Code.")
+            sys.exit(1)
+
+        # Note: Claude Code CLI currently doesn't support model selection via command line
+        # This is prepared for future API usage or when the feature is added
+        # For now, it uses whatever model Claude Code is configured with
+
+        return base_path
+
+    def get_default_prompts(self) -> Dict:
+        """Get default prompts if prompts.yaml is missing"""
+        # Default prompts when no config file exists
+        summary_prompt = """Analyze this podcast transcript and create a comprehensive summary with specific, actionable insights.
+
+First, provide:
+PODCAST_NAME: [Name of the podcast/show]
+TITLE: [Extract the main topic or most compelling insight as a title]
+EPISODE_INFO: [Guest name(s) and their role/company]
+
+Then create these sections:
+
+## Key Points (7-10 specific points with details)
+• Include concrete examples, metrics, and specific strategies mentioned
+• Each point should provide actionable detail, not generic statements
+• Focus on unique insights rather than obvious observations
+
+## Notable Quotes (5-7 memorable quotes)
+• Direct quotes that capture pivotal moments or unique perspectives
+• Include context and speaker attribution
+• Focus on counterintuitive or particularly insightful statements
+
+## Founder Insights
+Identify 2 specific pieces of information that would be particularly valuable for founders/entrepreneurs:
+• Focus on tactical advice, non-obvious lessons, or specific strategies
+• Include details about implementation or results mentioned
+
+## People, Companies & References
+• Key people: name, role, and why they're relevant to the discussion
+• Companies mentioned: what they do and why they were referenced
+• Books, frameworks, or concepts: brief explanation of each
+
+## Main Takeaways (3-4 detailed lessons)
+• Actionable insights with enough context to implement
+• Include any frameworks or mental models discussed
+• Connect to broader themes or principles
+
+## Episode Summary
+A comprehensive paragraph (7-10 sentences) that captures the narrative arc, key turning points in the conversation, and the unique value this episode provides. Include specific examples or stories that were discussed.
+
+## Critical Analysis & Rating
+Be intellectually honest and critical. Rate this podcast episode on three dimensions (1-10 scale):
+• Usefulness: Are the insights actually actionable or just platitudes? Do they provide specific steps?
+• Novelty: Is this genuinely new information or recycled conventional wisdom? What's truly counterintuitive?
+• Depth: Did they explore root causes and second-order effects, or stay surface-level? Were hard questions asked?
+
+Weaknesses: [What important topics were glossed over? What claims lacked evidence?]
+Strengths: [What genuine insights or unique perspectives were shared?]
+Overall Assessment: [Be critical - most podcasts should score 4-7, not 8-10]
+
+## Topics
+Relevant hashtags and categories for discovery
+
+Transcript:
+{transcript}"""
+
+        synthesis_prompt = """Based on this podcast summary, synthesize the most important insights or takeaways.
+
+Summary:
+{summary}
+
+Provide:
+CORE_INSIGHT: [One sentence that captures the non-obvious, most valuable insights from this conversation - be specific, not generic]
+USEFUL_BECAUSE: [2-3 sentences explaining why this insight matters and how it can be applied practically. What specific problem does it solve or opportunity does it create?]
+
+Be intellectually rigorous - focus on what's genuinely valuable, not what sounds impressive."""
+
+        return {
+            'summary_prompt': summary_prompt,
+            'synthesis_prompt': synthesis_prompt
+        }
 
     def generate_id(self, url: str) -> str:
         """Generate consistent ID for a URL"""
@@ -99,7 +236,7 @@ class PodcastProcessor:
                     transcript_list = YouTubeTranscriptApi.get_transcript(video_id)
                     return ' '.join([t['text'] for t in transcript_list])
             except Exception as e:
-                logger.debug(f"No YouTube transcript: {e}")
+                pass  # No transcript available from YouTube
 
         # Add other platform checks here if needed
         return None
@@ -156,14 +293,14 @@ class PodcastProcessor:
                         downloaded += len(chunk)
                         if total_size:
                             progress = (downloaded / total_size) * 100
-                            print(f'\rDownloading: {progress:.1f}%', end='', flush=True)
+                            # Silently update progress
 
-            print()  # New line after progress
-            logger.info(f"Audio saved: {output_path.name}")
+            # Download complete
+            print(f"✓ Audio downloaded")
             return output_path
 
         except Exception as e:
-            logger.error(f"Download failed: {e}")
+            print(f"Error: Download failed - {e}")
             return None
 
     def download_with_ytdlp(self, url: str, output_path: Path) -> Optional[Path]:
@@ -171,8 +308,8 @@ class PodcastProcessor:
         try:
             import yt_dlp
         except ImportError:
-            logger.info("Installing yt-dlp...")
-            subprocess.run([sys.executable, '-m', 'pip', 'install', 'yt-dlp'], check=True)
+            print("Installing yt-dlp...")
+            subprocess.run([sys.executable, '-m', 'pip', 'install', 'yt-dlp'], check=True, capture_output=True)
             import yt_dlp
 
         try:
@@ -186,6 +323,10 @@ class PodcastProcessor:
                 }],
                 'quiet': True,
                 'no_warnings': True,
+                'noprogress': True,
+                'postprocessor_args': {
+                    'FFmpegExtractAudio': ['-loglevel', 'quiet']
+                }
             }
 
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -193,111 +334,76 @@ class PodcastProcessor:
 
             # Check if file was created
             if output_path.exists():
-                logger.info(f"Audio saved: {output_path.name}")
+                print(f"✓ Audio downloaded")
                 return output_path
 
         except Exception as e:
-            logger.error(f"yt-dlp download failed: {e}")
+            print(f"Error: Download failed - {e}")
 
         return None
 
     def transcribe_audio(self, audio_path: Path, podcast_id: str) -> Optional[str]:
         """Transcribe audio using Whisper"""
         transcript_path = self.transcript_dir / f"{podcast_id}.txt"
-        json_path = self.transcript_dir / f"{podcast_id}.json"
 
         # Check if transcript already exists
         if transcript_path.exists():
-            logger.info(f"Using cached transcript: {transcript_path.name}")
+            print(f"✓ Using cached transcript")
             return transcript_path.read_text(encoding='utf-8')
 
         try:
             import whisper
         except ImportError:
-            logger.info("Installing OpenAI Whisper...")
-            subprocess.run([sys.executable, '-m', 'pip', 'install', 'openai-whisper'], check=True)
+            print("Installing OpenAI Whisper...")
+            subprocess.run([sys.executable, '-m', 'pip', 'install', 'openai-whisper'], check=True, capture_output=True)
             import whisper
 
         try:
-            logger.info("Loading Whisper model...")
+            print("Transcribing audio (this may take a few minutes)...")
+            # Suppress Whisper warnings about FP16 on CPU
+            import warnings
+            warnings.filterwarnings("ignore", category=UserWarning, module="whisper")
             model = whisper.load_model("base")
-
-            logger.info("Transcribing audio (this may take a few minutes)...")
             result = model.transcribe(str(audio_path))
 
-            # Save transcript
+            # Save transcript (text only, no metadata)
             transcript_path.write_text(result['text'], encoding='utf-8')
-            json_path.write_text(json.dumps(result, indent=2, ensure_ascii=False), encoding='utf-8')
 
-            logger.info(f"Transcript saved: {transcript_path.name}")
+            print(f"✓ Transcript saved")
             return result['text']
 
         except Exception as e:
-            logger.error(f"Transcription failed: {e}")
+            print(f"Error: Transcription failed - {e}")
             return None
 
     def summarize_transcript(self, transcript: str, podcast_id: str, url: str) -> str:
         """Generate summary using Claude"""
         summary_path = self.summary_dir / f"{podcast_id}.md"
 
-        # Check if summary already exists
-        if summary_path.exists():
-            logger.info(f"Using cached summary: {summary_path.name}")
+        # Check if summary already exists (unless force regenerate)
+        if summary_path.exists() and not self.force_regenerate:
+            print(f"✓ Using cached summary")
             return summary_path.read_text(encoding='utf-8')
 
-        prompt = f"""Analyze this podcast transcript and create a comprehensive summary with specific, actionable insights.
+        # Get prompt template (use default since prompts are now internal)
+        prompt_template = self.get_default_prompts()['summary_prompt']
 
-First, provide:
-PODCAST_NAME: [Name of the podcast/show]
-TITLE: [Extract the main topic or most compelling insight as a title]
-EPISODE_INFO: [Guest name(s) and their role/company]
-TWO_LINE_SUMMARY: [2 sentence overview capturing the core value and unique perspective of this episode]
+        # Prepare context variables from unified config
+        profile = self.config.get('profile', {})
+        user_context = profile.get('context', '')
+        user_role = profile.get('role', 'general')
+        user_interests = ', '.join(profile.get('interests', []))
+        user_goals = '; '.join(profile.get('goals', []))
 
-Then create these sections:
-
-## Key Points (7-10 specific points with details)
-• Include concrete examples, metrics, and specific strategies mentioned
-• Each point should provide actionable detail, not generic statements
-• Focus on unique insights rather than obvious observations
-
-## Notable Quotes (5-7 memorable quotes)
-• Direct quotes that capture pivotal moments or unique perspectives
-• Include context and speaker attribution
-• Focus on counterintuitive or particularly insightful statements
-
-## Founder Insights
-Identify 2 specific pieces of information that would be particularly valuable for founders/entrepreneurs:
-• Focus on tactical advice, non-obvious lessons, or specific strategies
-• Include details about implementation or results mentioned
-
-## People, Companies & References
-• Key people: name, role, and why they're relevant to the discussion
-• Companies mentioned: what they do and why they were referenced
-• Books, frameworks, or concepts: brief explanation of each
-
-## Main Takeaways (3-4 detailed lessons)
-• Actionable insights with enough context to implement
-• Include any frameworks or mental models discussed
-• Connect to broader themes or principles
-
-## Episode Summary
-A comprehensive paragraph (7-10 sentences) that captures the narrative arc, key turning points in the conversation, and the unique value this episode provides. Include specific examples or stories that were discussed.
-
-## Insight Rating
-Rate this podcast episode on three dimensions (1-10 scale):
-• Usefulness: How actionable and practical are the insights?
-• Novelty: How unique or counterintuitive is the information?
-• Depth: How thoroughly were topics explored with specific examples?
-Overall Assessment: [Brief explanation of the rating]
-
-## Topics
-Relevant hashtags and categories for discovery
-
-Transcript:
-{transcript[:50000]}"""
+        # Replace placeholders in prompt template
+        prompt = prompt_template.replace('{user_context}', user_context)
+        prompt = prompt.replace('{user_role}', user_role)
+        prompt = prompt.replace('{user_interests}', user_interests)
+        prompt = prompt.replace('{user_goals}', user_goals)
+        prompt = prompt.replace('{transcript}', transcript[:50000])
 
         try:
-            logger.info("Generating summary with Claude...")
+            print("Generating summary with Claude...")
             result = subprocess.run(
                 [str(self.claude_path), '--print', prompt],
                 capture_output=True,
@@ -306,7 +412,29 @@ Transcript:
             )
 
             if result.returncode == 0 and result.stdout:
-                summary = result.stdout.strip()
+                initial_summary = result.stdout.strip()
+
+                # Second stage: Synthesize the core insight
+                synthesis_template = self.get_default_prompts()['synthesis_prompt']
+
+                # Replace placeholders in synthesis prompt
+                synthesis_prompt = synthesis_template.replace('{user_context}', user_context)
+                synthesis_prompt = synthesis_prompt.replace('{user_role}', user_role)
+                synthesis_prompt = synthesis_prompt.replace('{user_interests}', user_interests)
+                synthesis_prompt = synthesis_prompt.replace('{user_goals}', user_goals)
+                synthesis_prompt = synthesis_prompt.replace('{summary}', initial_summary)
+
+                print("Synthesizing core insight...")
+                synthesis_result = subprocess.run(
+                    [str(self.claude_path), '--print', synthesis_prompt],
+                    capture_output=True,
+                    text=True,
+                    timeout=60  # 1 minute for synthesis
+                )
+
+                synthesis = ""
+                if synthesis_result.returncode == 0 and synthesis_result.stdout:
+                    synthesis = synthesis_result.stdout.strip() + "\n\n"
 
                 # Add metadata header
                 header = f"""---
@@ -316,27 +444,28 @@ Date: {datetime.now().strftime('%Y-%m-%d %H:%M')}
 ---
 
 """
-                full_summary = header + summary
+                full_summary = header + synthesis + initial_summary
 
-                # Save summary
+                # Save summary with synthesis
                 summary_path.write_text(full_summary, encoding='utf-8')
-                logger.info(f"Summary saved: {summary_path.name}")
+                print(f"✓ Summary generated with core insight")
 
                 return full_summary
             else:
-                logger.error(f"Claude error: {result.stderr}")
+                print(f"Error: Claude failed - {result.stderr}")
                 return "Summary generation failed"
 
         except subprocess.TimeoutExpired:
-            logger.error("Claude summarization timed out")
+            print("Error: Claude summarization timed out (5 minute limit)")
             return "Summary generation timed out"
         except Exception as e:
-            logger.error(f"Summarization failed: {e}")
+            print(f"Error: Summarization failed - {e}")
             return f"Summary generation failed: {e}"
 
     def load_email_config(self) -> Optional[Dict[str, str]]:
         """Load email configuration from .env file"""
-        env_file = self.base_dir / '.env'
+        # Always look for .env in the script's directory
+        env_file = self.script_dir / '.env'
 
         # Try .env file first
         if env_file.exists():
@@ -344,7 +473,7 @@ Date: {datetime.now().strftime('%Y-%m-%d %H:%M')}
                 from dotenv import load_dotenv
                 load_dotenv(env_file)
             except ImportError:
-                logger.debug("python-dotenv not installed, reading .env manually")
+                # python-dotenv not installed, reading .env manually
                 # Manual .env parsing
                 with open(env_file, 'r') as f:
                     for line in f:
@@ -368,66 +497,188 @@ Date: {datetime.now().strftime('%Y-%m-%d %H:%M')}
                 'email_to': email_to
             }
 
-        logger.info("Email configuration not found or incomplete. Email sending disabled.")
-        logger.info("To enable email, create a .env file with:")
-        logger.info("  SMTP_SERVER=smtp.gmail.com")
-        logger.info("  SMTP_PORT=587")
-        logger.info("  EMAIL_FROM=your-email@gmail.com")
-        logger.info("  EMAIL_PASSWORD=your-app-password")
-        logger.info("  EMAIL_TO=recipient@example.com")
+        # Email not configured
         return None
 
-    def format_email_body(self, summary: str, url: str = None) -> str:
-        """Format summary for plain text email (Gmail-friendly)"""
-        lines = summary.split('\n')
-        formatted = []
+    def extract_summary_metadata(self, summary: str) -> Dict[str, str]:
+        """Extract metadata from summary for display"""
+        metadata = {
+            'podcast_name': '',
+            'title': '',
+            'episode_info': '',
+            'core_insight': '',
+            'useful_because': ''
+        }
 
-        # Extract metadata from summary
-        podcast_name = None
-        title = None
-        episode_info = None
-        two_line = None
+        lines = summary.split('\n')
+        capture_next_lines = False
+        useful_lines = []
 
         for line in lines:
             if line.startswith('PODCAST_NAME:'):
-                podcast_name = line.replace('PODCAST_NAME:', '').strip()
+                metadata['podcast_name'] = line.replace('PODCAST_NAME:', '').strip()
             elif line.startswith('TITLE:'):
-                title = line.replace('TITLE:', '').strip()
+                metadata['title'] = line.replace('TITLE:', '').strip()
             elif line.startswith('EPISODE_INFO:'):
-                episode_info = line.replace('EPISODE_INFO:', '').strip()
-            elif line.startswith('TWO_LINE_SUMMARY:'):
-                two_line = line.replace('TWO_LINE_SUMMARY:', '').strip()
+                metadata['episode_info'] = line.replace('EPISODE_INFO:', '').strip()
+            elif line.startswith('CORE_INSIGHT:'):
+                metadata['core_insight'] = line.replace('CORE_INSIGHT:', '').strip()
+            elif line.startswith('USEFUL_BECAUSE:'):
+                useful_text = line.replace('USEFUL_BECAUSE:', '').strip()
+                if useful_text:
+                    metadata['useful_because'] = useful_text
+                else:
+                    capture_next_lines = True
+            elif capture_next_lines and line.strip() and not line.startswith('#'):
+                useful_lines.append(line.strip())
+                if len(useful_lines) >= 3 or not line.strip():
+                    capture_next_lines = False
 
-        # Add header
-        if podcast_name:
-            formatted.append(f"PODCAST: {podcast_name}")
-        if episode_info:
-            formatted.append(f"GUEST: {episode_info}")
+        if useful_lines and not metadata['useful_because']:
+            metadata['useful_because'] = ' '.join(useful_lines)
+
+        return metadata
+
+    def format_email_body(self, summary: str, url: str = None) -> str:
+        """Format summary for plain text email (Gmail-friendly with better spacing)"""
+        import urllib.parse
+        lines = summary.split('\n')
+        formatted = []
+
+        # Extract all metadata first
+        metadata = {}
+        content_sections = {}
+        current_section = None
+        section_content = []
+
+        for line in lines:
+            # Extract metadata
+            if line.startswith('PODCAST_NAME:'):
+                metadata['podcast_name'] = line.replace('PODCAST_NAME:', '').strip()
+            elif line.startswith('TITLE:'):
+                metadata['title'] = line.replace('TITLE:', '').strip()
+            elif line.startswith('EPISODE_INFO:'):
+                metadata['episode_info'] = line.replace('EPISODE_INFO:', '').strip()
+            elif line.startswith('CORE_INSIGHT:'):
+                metadata['core_insight'] = line.replace('CORE_INSIGHT:', '').strip()
+            elif line.startswith('USEFUL_BECAUSE:'):
+                metadata['useful_because'] = line.replace('USEFUL_BECAUSE:', '').strip()
+            # Capture sections
+            elif line.startswith('## '):
+                if current_section and section_content:
+                    content_sections[current_section] = section_content
+                current_section = line.replace('## ', '').strip()
+                section_content = []
+            elif current_section and line.strip():
+                section_content.append(line)
+
+        # Save last section
+        if current_section and section_content:
+            content_sections[current_section] = section_content
+
+        # BUILD EMAIL IN OPTIMAL ORDER FOR SKIMMING
+
+        # 1. Header with key metadata
+        formatted.append("="*60)
+        if metadata.get('podcast_name'):
+            formatted.append(f"PODCAST: {metadata['podcast_name']}")
+        if metadata.get('episode_info'):
+            formatted.append(f"GUEST: {metadata['episode_info']}")
         if url:
             formatted.append(f"LINK: {url}")
-        if two_line:
-            formatted.append(f"\nSUMMARY:\n{two_line}")
+        formatted.append("="*60 + "\n")
 
-        formatted.append("\n" + "="*60 + "\n")
+        # 2. CORE INSIGHT (Most important - at top)
+        if metadata.get('core_insight'):
+            formatted.append("💡 CORE INSIGHT:")
+            formatted.append(metadata['core_insight'])
+            formatted.append("")
 
-        # Process rest of summary
-        in_section = False
-        for line in lines:
-            # Skip the extracted header lines
-            if line.startswith(('PODCAST_NAME:', 'TITLE:', 'EPISODE_INFO:', 'TWO_LINE_SUMMARY:')):
-                continue
+        if metadata.get('useful_because'):
+            formatted.append("✅ USEFUL BECAUSE:")
+            formatted.append(metadata['useful_because'])
+            formatted.append("\n" + "="*60 + "\n")
 
-            # Convert markdown headers to plain text sections
-            if line.startswith('## '):
-                formatted.append("\n" + line.replace('## ', '').upper())
-                formatted.append("-" * 40)
-                in_section = True
-            elif line.startswith('# '):
-                continue  # Skip main header
-            elif line.strip():
-                # Remove markdown formatting
+        # 3. KEY TAKEAWAYS (Actionable items)
+        if 'Main Takeaways' in content_sections:
+            formatted.append("🎯 MAIN TAKEAWAYS")
+            formatted.append("-" * 40)
+            for line in content_sections['Main Takeaways']:
                 clean_line = line.replace('**', '').replace('*', '').replace('•', '-')
                 formatted.append(clean_line)
+                formatted.append("")  # Extra space between items
+            formatted.append("")
+
+        # 4. NOTABLE QUOTES (Memorable)
+        if 'Notable Quotes' in content_sections:
+            formatted.append("💬 NOTABLE QUOTES")
+            formatted.append("-" * 40)
+            for line in content_sections['Notable Quotes']:
+                clean_line = line.replace('**', '').replace('*', '').replace('•', '"')
+                formatted.append(clean_line)
+                formatted.append("")  # Extra space between quotes
+            formatted.append("")
+
+        # 5. KEY POINTS (Detailed insights)
+        if 'Key Points' in content_sections:
+            formatted.append("📌 KEY POINTS")
+            formatted.append("-" * 40)
+            for line in content_sections['Key Points']:
+                clean_line = line.replace('**', '').replace('*', '').replace('•', '-')
+                formatted.append(clean_line)
+                formatted.append("")  # Extra space between points
+            formatted.append("")
+
+        # 6. PEOPLE & COMPANIES WITH SEARCH LINKS
+        if 'People, Companies & References' in content_sections:
+            formatted.append("🔍 PEOPLE, COMPANIES & REFERENCES")
+            formatted.append("-" * 40)
+            for line in content_sections['People, Companies & References']:
+                clean_line = line.replace('**', '').replace('*', '').replace('•', '-')
+
+                # Add Google search link for each entity
+                if ':' in clean_line and not clean_line.startswith('http'):
+                    entity = clean_line.split(':')[0].strip(' -•')
+                    if entity:
+                        search_query = urllib.parse.quote(entity)
+                        search_link = f"  → Search: https://www.google.com/search?q={search_query}"
+                        formatted.append(clean_line)
+                        formatted.append(search_link)
+                    else:
+                        formatted.append(clean_line)
+                else:
+                    formatted.append(clean_line)
+                formatted.append("")  # Extra space
+            formatted.append("")
+
+        # 7. FOUNDER/ROLE-SPECIFIC INSIGHTS
+        for section_name in content_sections:
+            if 'Insights' in section_name and section_name not in ['Main Takeaways']:
+                formatted.append(f"🚀 {section_name.upper()}")
+                formatted.append("-" * 40)
+                for line in content_sections[section_name]:
+                    clean_line = line.replace('**', '').replace('*', '').replace('•', '-')
+                    formatted.append(clean_line)
+                    formatted.append("")
+                formatted.append("")
+
+        # 8. CRITICAL RATING (At bottom for context)
+        if 'Critical Analysis & Rating' in content_sections:
+            formatted.append("📊 CRITICAL ANALYSIS & RATING")
+            formatted.append("-" * 40)
+            for line in content_sections['Critical Analysis & Rating']:
+                clean_line = line.replace('**', '').replace('*', '').replace('•', '-')
+                formatted.append(clean_line)
+            formatted.append("")
+
+        # 9. EPISODE SUMMARY (Full context at end)
+        if 'Episode Summary' in content_sections:
+            formatted.append("📝 FULL EPISODE SUMMARY")
+            formatted.append("-" * 40)
+            for line in content_sections['Episode Summary']:
+                clean_line = line.replace('**', '').replace('*', '')
+                formatted.append(clean_line)
+            formatted.append("")
 
         return '\n'.join(formatted)
 
@@ -477,20 +728,20 @@ Date: {datetime.now().strftime('%Y-%m-%d %H:%M')}
                 server.login(self.email_config['email_from'], self.email_config['email_password'])
                 server.send_message(msg)
 
-            logger.info(f"Summary emailed to {self.email_config['email_to']}")
+            print(f"✓ Summary emailed to {self.email_config['email_to']}")
             return True
 
         except Exception as e:
-            logger.error(f"Failed to send email: {e}")
+            print(f"Error: Failed to send email - {e}")
             return False
 
     def process_url(self, url: str) -> Dict[str, any]:
         """Process a podcast URL"""
-        logger.info(f"Processing: {url}")
+        print(f"\nProcessing: {url}")
 
         # Generate consistent ID
         podcast_id = self.generate_id(url)
-        logger.info(f"Podcast ID: {podcast_id}")
+        # Podcast ID: {podcast_id}
 
         # Check existing files
         existing = self.get_existing_files(podcast_id)
@@ -499,14 +750,14 @@ Date: {datetime.now().strftime('%Y-%m-%d %H:%M')}
         transcript = None
 
         if existing['transcript']:
-            logger.info(f"Found existing transcript: {existing['transcript'].name}")
+            print(f"✓ Using cached transcript")
             transcript = existing['transcript'].read_text(encoding='utf-8')
         else:
             # Try to fetch platform transcript
             transcript = self.fetch_transcript(url)
 
             if transcript:
-                logger.info("Using platform transcript")
+                print(f"✓ Found platform transcript")
                 # Save fetched transcript
                 transcript_path = self.transcript_dir / f"{podcast_id}.txt"
                 transcript_path.write_text(transcript, encoding='utf-8')
@@ -515,19 +766,19 @@ Date: {datetime.now().strftime('%Y-%m-%d %H:%M')}
                 audio_path = existing['audio']
 
                 if not audio_path:
-                    logger.info("Downloading audio...")
+                    print("Downloading audio...")
                     audio_path = self.download_audio(url, podcast_id)
 
                 if audio_path:
                     transcript = self.transcribe_audio(audio_path, podcast_id)
 
         if not transcript:
-            logger.error("Failed to obtain transcript")
+            print("Error: Failed to obtain transcript")
             return {'success': False, 'error': 'Could not obtain transcript'}
 
-        # Generate or use existing summary
-        if existing['summary']:
-            logger.info(f"Found existing summary: {existing['summary'].name}")
+        # Generate or use existing summary (check cache unless force regenerate)
+        if existing['summary'] and not self.force_regenerate:
+            print(f"✓ Using cached summary")
             summary = existing['summary'].read_text(encoding='utf-8')
         else:
             summary = self.summarize_transcript(transcript, podcast_id, url)
@@ -535,7 +786,14 @@ Date: {datetime.now().strftime('%Y-%m-%d %H:%M')}
         # Send email if configured
         if self.enable_email and self.email_config:
             transcript_file = self.transcript_dir / f"{podcast_id}.txt"
-            subject = f"Podcast Summary - {podcast_id}"
+            # Extract core insight for subject line
+            metadata = self.extract_summary_metadata(summary)
+            if metadata['core_insight']:
+                # Truncate insight to 50 chars for subject
+                insight_preview = metadata['core_insight'][:50] + "..." if len(metadata['core_insight']) > 50 else metadata['core_insight']
+                subject = f"🎙️ {insight_preview}"
+            else:
+                subject = f"Podcast Summary - {podcast_id}"
             self.send_email(subject, summary, url, transcript_file)
 
         return {
@@ -548,9 +806,52 @@ Date: {datetime.now().strftime('%Y-%m-%d %H:%M')}
             'email_sent': self.email_config is not None
         }
 
+    def process_transcript(self, transcript_path: Path) -> Dict[str, any]:
+        """Process an existing transcript file"""
+        print(f"\nProcessing transcript: {transcript_path.name}")
+
+        # Generate ID from filename
+        podcast_id = transcript_path.stem
+
+        # Read transcript
+        if not transcript_path.exists():
+            return {'success': False, 'error': f'Transcript file not found: {transcript_path}'}
+
+        transcript = transcript_path.read_text(encoding='utf-8')
+
+        # Check for existing summary (unless force regenerate)
+        existing = self.get_existing_files(podcast_id)
+        if existing['summary'] and not self.force_regenerate:
+            print(f"✓ Using cached summary")
+            summary = existing['summary'].read_text(encoding='utf-8')
+        else:
+            # Summarize
+            summary = self.summarize_transcript(transcript, podcast_id, str(transcript_path))
+
+        # Send email if configured
+        if self.enable_email and self.email_config:
+            # Extract core insight for subject line
+            metadata = self.extract_summary_metadata(summary)
+            if metadata['core_insight']:
+                # Truncate insight to 50 chars for subject
+                insight_preview = metadata['core_insight'][:50] + "..." if len(metadata['core_insight']) > 50 else metadata['core_insight']
+                subject = f"🎙️ {insight_preview}"
+            else:
+                subject = f"Podcast Summary - {transcript_path.name}"
+            self.send_email(subject, summary, str(transcript_path), transcript_path)
+
+        return {
+            'success': True,
+            'id': podcast_id,
+            'transcript_file': transcript_path,
+            'summary_file': self.summary_dir / f"{podcast_id}.md",
+            'summary': summary,
+            'email_sent': self.email_config is not None
+        }
+
     def process_mp3(self, mp3_path: Path) -> Dict[str, any]:
         """Process an existing MP3 file"""
-        logger.info(f"Processing MP3: {mp3_path}")
+        print(f"\nProcessing MP3: {mp3_path.name}")
 
         # Generate ID from filename
         podcast_id = mp3_path.stem
@@ -567,7 +868,14 @@ Date: {datetime.now().strftime('%Y-%m-%d %H:%M')}
         # Send email if configured
         if self.enable_email and self.email_config:
             transcript_file = self.transcript_dir / f"{podcast_id}.txt"
-            subject = f"Podcast Summary - {mp3_path.name}"
+            # Extract core insight for subject line
+            metadata = self.extract_summary_metadata(summary)
+            if metadata['core_insight']:
+                # Truncate insight to 50 chars for subject
+                insight_preview = metadata['core_insight'][:50] + "..." if len(metadata['core_insight']) > 50 else metadata['core_insight']
+                subject = f"🎙️ {insight_preview}"
+            else:
+                subject = f"Podcast Summary - {mp3_path.name}"
             self.send_email(subject, summary, str(mp3_path), transcript_file)
 
         return {
@@ -592,15 +900,19 @@ def main():
 Examples:
   %(prog)s https://pca.st/episode/abc123
   %(prog)s --mp3 audio.mp3
+  %(prog)s --transcript transcript.txt
   %(prog)s --batch audio_files/*.mp3
         """
     )
 
     parser.add_argument('url', nargs='?', help='Podcast URL to process')
     parser.add_argument('--mp3', help='Process existing MP3 file')
+    parser.add_argument('--transcript', help='Process existing transcript file')
     parser.add_argument('--batch', nargs='+', help='Process multiple files')
+    parser.add_argument('--force', '-f', action='store_true', help='Force regeneration (skip cached summaries)')
     parser.add_argument('--verbose', '-v', action='store_true', help='Enable verbose output')
     parser.add_argument('--no-email', action='store_true', help='Disable email sending')
+    parser.add_argument('--model', help='Claude model to use (opus, sonnet, haiku) - requires API access')
 
     args = parser.parse_args()
 
@@ -608,7 +920,11 @@ Examples:
         logging.getLogger().setLevel(logging.DEBUG)
 
     # Initialize processor
-    processor = PodcastProcessor(enable_email=not args.no_email)
+    processor = PodcastProcessor(
+        enable_email=not args.no_email,
+        force_regenerate=args.force,
+        model=args.model
+    )
 
     # Process based on input
     if args.batch:
@@ -618,45 +934,98 @@ Examples:
                 if file_path.suffix.lower() in ['.mp3', '.m4a', '.wav']:
                     result = processor.process_mp3(file_path)
                     if result['success']:
+                        # Extract and display metadata for batch processing
+                        metadata = processor.extract_summary_metadata(result['summary'])
                         print(f"\n{'='*60}")
                         print(f"✅ Processed: {file_path.name}")
-                        print(f"   ID: {result['id']}")
-                        print(f"   Summary: {result['summary_file']}")
+                        if metadata['podcast_name']:
+                            print(f"   🎙️ {metadata['podcast_name']}")
+                        if metadata['title']:
+                            # Truncate long titles
+                            title = metadata['title'][:50] + '...' if len(metadata['title']) > 50 else metadata['title']
+                            print(f"   📝 {title}")
+                        print(f"   📁 {result['summary_file'].name}")
+
+    elif args.transcript:
+        # Single transcript file
+        transcript_path = Path(args.transcript)
+        if not transcript_path.exists():
+            print(f"Error: File not found - {args.transcript}")
+            sys.exit(1)
+
+        result = processor.process_transcript(transcript_path)
+        if result['success']:
+            # Extract and display metadata
+            metadata = processor.extract_summary_metadata(result['summary'])
+            print(f"\n{'='*60}")
+            if metadata['podcast_name']:
+                print(f"🎙️  Podcast: {metadata['podcast_name']}")
+            if metadata['title']:
+                print(f"📝  Episode: {metadata['title']}")
+            if metadata['episode_info']:
+                print(f"👤  Guest: {metadata['episode_info']}")
+            if metadata['core_insight']:
+                print(f"\n💡  Core Insight:\n    {metadata['core_insight']}")
+            if metadata['useful_because']:
+                print(f"\n✅  Useful Because:\n    {metadata['useful_because']}")
+            print(f"{'='*60}\n")
+            print(f"✓ Files saved:")
+            print(f"  • Summary: {result['summary_file'].name}")
+            if result.get('email_sent'):
+                print(f"  • Email sent to {processor.email_config['email_to']}")
 
     elif args.mp3:
         # Single MP3
         mp3_path = Path(args.mp3)
         if not mp3_path.exists():
-            logger.error(f"File not found: {args.mp3}")
+            print(f"Error: File not found - {args.mp3}")
             sys.exit(1)
 
         result = processor.process_mp3(mp3_path)
         if result['success']:
+            # Extract and display metadata
+            metadata = processor.extract_summary_metadata(result['summary'])
             print(f"\n{'='*60}")
-            print(result['summary'])
+            if metadata['podcast_name']:
+                print(f"🎙️  Podcast: {metadata['podcast_name']}")
+            if metadata['title']:
+                print(f"📝  Episode: {metadata['title']}")
+            if metadata['episode_info']:
+                print(f"👤  Guest: {metadata['episode_info']}")
+            if metadata['core_insight']:
+                print(f"\n💡  Core Insight:\n    {metadata['core_insight']}")
+            if metadata['useful_because']:
+                print(f"\n✅  Useful Because:\n    {metadata['useful_because']}")
             print(f"{'='*60}\n")
-            print(f"Files saved:")
-            print(f"  Transcript: {result['transcript_file']}")
-            print(f"  Summary: {result['summary_file']}")
+            print(f"✓ Files saved:")
+            print(f"  • Transcript: {result['transcript_file'].name}")
+            print(f"  • Summary: {result['summary_file'].name}")
             if result.get('email_sent'):
-                print(f"  Email: Sent to {processor.email_config['email_to']}")
-            elif not args.no_email:
-                print(f"  Email: Not configured (see .env.example)")
+                print(f"  • Email sent to {processor.email_config['email_to']}")
 
     elif args.url:
         # URL processing
         result = processor.process_url(args.url)
         if result['success']:
+            # Extract and display metadata
+            metadata = processor.extract_summary_metadata(result['summary'])
             print(f"\n{'='*60}")
-            print(result['summary'])
+            if metadata['podcast_name']:
+                print(f"🎙️  Podcast: {metadata['podcast_name']}")
+            if metadata['title']:
+                print(f"📝  Episode: {metadata['title']}")
+            if metadata['episode_info']:
+                print(f"👤  Guest: {metadata['episode_info']}")
+            if metadata['core_insight']:
+                print(f"\n💡  Core Insight:\n    {metadata['core_insight']}")
+            if metadata['useful_because']:
+                print(f"\n✅  Useful Because:\n    {metadata['useful_because']}")
             print(f"{'='*60}\n")
-            print(f"Files saved:")
-            print(f"  Transcript: {result['transcript_file']}")
-            print(f"  Summary: {result['summary_file']}")
+            print(f"✓ Files saved:")
+            print(f"  • Transcript: {result['transcript_file'].name}")
+            print(f"  • Summary: {result['summary_file'].name}")
             if result.get('email_sent'):
-                print(f"  Email: Sent to {processor.email_config['email_to']}")
-            elif not args.no_email:
-                print(f"  Email: Not configured (see .env.example)")
+                print(f"  • Email sent to {processor.email_config['email_to']}")
 
     else:
         parser.print_help()

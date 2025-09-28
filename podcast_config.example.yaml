@@ -1,0 +1,59 @@
+# Podcast Summarizer Configuration - EXAMPLE
+# Copy this to podcast_config.yaml and customize with your details
+
+# ============================================
+# YOUR PROFILE (Edit this section)
+# ============================================
+
+profile:
+  role: founder  # Options: founder, investor, operator, engineer, researcher, student
+
+  interests:
+    - AI and machine learning
+    - B2B SaaS
+    - Developer tools
+    - Growth strategies
+
+  goals:
+    - Find tactics I can implement this week
+    - Identify market opportunities
+    - Learn from other founders' mistakes
+    - Find insights for content creation
+
+  # Brief context about you (this helps Claude tailor insights)
+  context: |
+    I'm building [your company/project].
+    I'm particularly interested in [specific challenges/opportunities].
+
+# ============================================
+# OUTPUT PREFERENCES
+# ============================================
+
+preferences:
+  critical_rating: true       # Be harsh in ratings (most podcasts score 4-7)
+  emphasis: actionable        # Options: actionable, theoretical, strategic
+  max_quotes: 7               # Number of quotes to extract (5-10)
+  max_key_points: 10          # Number of key points (7-12)
+  prefer_metrics: true        # Emphasize quantitative insights
+  prefer_examples: true       # Prioritize concrete examples over theory
+
+# ============================================
+# EMAIL SETTINGS
+# ============================================
+
+email:
+  subject_prefix: "🎙️"        # Emoji/text before subject
+  include_transcript: true    # Attach full transcript to emails
+
+# ============================================
+# ADVANCED (Optional)
+# ============================================
+
+prompts:
+  custom_sections: []
+  summary_modifications: ""
+  synthesis_modifications: ""
+
+claude:
+  model: default  # Options: default, opus, sonnet, haiku
+  temperature: 0.7

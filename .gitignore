@@ -3,6 +3,13 @@
 .env.local
 *.env
 
+# Personal configuration (contains user-specific data)
+podcast_config.yaml
+config.yaml
+config.yaml.old
+prompts.yaml
+prompts.yaml.old
+
 # Audio Files
 audio_files/*.mp3
 audio_files/*.wav
@@ -55,6 +62,7 @@ test_*.py
 # Archive
 archive/
 old_versions/
+improvements/
 
 # Temporary files
 *.tmp
