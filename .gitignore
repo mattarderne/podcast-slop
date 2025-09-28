@@ -1,0 +1,63 @@
+# Environment and Config
+.env
+.env.local
+*.env
+
+# Audio Files
+audio_files/*.mp3
+audio_files/*.wav
+audio_files/*.m4a
+*.mp3
+*.wav
+*.m4a
+
+# Transcripts (may contain copyrighted content)
+transcripts/*.txt
+transcripts/*.json
+transcripts/*.vtt
+transcripts/*.srt
+
+# Summaries
+summaries/*.md
+summaries/*.txt
+summaries/*.html
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+.venv
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
+logs/
+
+# Test files
+test_*.txt
+test_*.py
+*_test.py
+
+# Archive
+archive/
+old_versions/
+
+# Temporary files
+*.tmp
+*.temp
+tmp/
+temp/
