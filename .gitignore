@@ -11,12 +11,21 @@ prompts.yaml
 prompts.yaml.old
 
 # Audio Files
-audio_files/*.mp3
-audio_files/*.wav
-audio_files/*.m4a
+audio_files/
 *.mp3
 *.wav
 *.m4a
+*.aac
+*.flac
+
+# Video Files
+video-files/
+video_frames/
+*.mp4
+*.avi
+*.mov
+*.mkv
+*.webm
 
 # Transcripts (may contain copyrighted content)
 transcripts/*.txt
@@ -24,10 +33,11 @@ transcripts/*.json
 transcripts/*.vtt
 transcripts/*.srt
 
-# Summaries
+# Summaries (contain processed content)
 summaries/*.md
 summaries/*.txt
 summaries/*.html
+summaries/*.pdf
 
 # Python
 __pycache__/
@@ -69,3 +79,9 @@ improvements/
 *.temp
 tmp/
 temp/
+
+# Experimental/network analysis files
+*_network*.py
+*_network*.json
+*_network*.html
+podcast_network*

@@ -1,10 +1,13 @@
 # Podcast Summarizer
 
-CLI podcast summaries sent to email. 
+Smart CLI tool that automatically transcribes and summarizes **any content** - podcasts, videos, articles, or local files.
 
 ```bash
-# Simple one-line usage after setup
-podcast "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+# Just give it any input - it figures out what to do!
+podcast "https://www.youtube.com/watch?v=..."  # Video
+podcast "https://example.com/article"          # Article
+podcast "video.mp4"                            # Local video
+podcast "audio.mp3"                            # Local audio
 ```
 
 Uses:
@@ -16,57 +19,57 @@ Uses:
 
 ## Usage
 
-### Quick Start with CLI Alias
+### Automatic Content Detection
 
-After installation, you can use the simple `podcast` command:
-
-```bash
-# Process any podcast URL
-podcast "https://www.youtube.com/watch?v=..."
-
-# Process without email
-podcast "https://pca.st/episode/..." --no-email
-
-# Process existing MP3
-podcast --mp3 podcast.mp3
-
-# Process existing transcript
-podcast --transcript transcript.txt
-
-# Force regeneration (skip cache)
-podcast "url" --force
-
-# Batch processing
-podcast --batch audio_files/*.mp3
-```
-
-### Full Command Options
+The tool automatically detects what you're processing:
 
 ```bash
-# Without alias - using Python directly
-python3 podcast_summarizer.py "https://www.youtube.com/watch?v=..."
+# URLs - auto-detects type
+podcast "https://www.youtube.com/watch?v=..."      # → Video (transcribe audio)
+podcast "https://pca.st/episode/abc123"            # → Podcast (download & transcribe)
+podcast "https://www.mckinsey.com/article"         # → Article (extract text)
 
-# Process without email
-python3 podcast_summarizer.py "https://pca.st/episode/..." --no-email
+# Local files - detects from extension
+podcast "video.mp4"                                # → Video (extract audio & transcribe)
+podcast "audio.mp3"                                # → Audio (transcribe)
+podcast "transcript.txt"                           # → Transcript (summarize directly)
 
-# Process existing MP3
-python3 podcast_summarizer.py --mp3 podcast.mp3
+# Batch processing - auto-detects each file
+podcast --batch media_files/*                      # Handles mixed types!
 
-# Batch process all MP3s in audio_files/
-python3 process_existing.py --all
+# Force specific mode if needed
+podcast -t "https://example.com"                   # Force article mode
+podcast --screenshots "https://youtube.com/..."    # Force screenshot analysis
 
-# Enable verbose output
-python3 podcast_summarizer.py --verbose "url"
+# Add custom requests to any content
+podcast -p "extract 4 linkedin quotes" "https://youtube.com/watch?v=..."
+podcast -p "focus on technical details" "https://blog.example.com/post"
 ```
 
-### Supported Platforms
+### How Auto-Detection Works
 
-| Platform | Transcript | Audio | Notes |
-|----------|------------|-------|-------|
-| YouTube | Native | Yes | Auto-fetches captions when available |
-| PocketCasts | No | Yes | Direct MP3 extraction |
-| Spotify | No | Yes | Via yt-dlp |
-| Direct MP3 | No | Yes | Any MP3 URL |
+The tool automatically determines content type from:
+
+1. **Local files** - by file extension:
+   - Audio: `.mp3`, `.m4a`, `.wav`, `.aac`, `.flac`
+   - Video: `.mp4`, `.avi`, `.mov`, `.mkv`, `.webm`
+   - Text: `.txt`, `.md`
+
+2. **URLs** - by pattern matching and HTTP headers:
+   - YouTube/Vimeo links → Video
+   - Podcast platforms (PocketCasts, Spotify) → Podcast
+   - Other URLs → Checks HTTP Content-Type header
+   - Default fallback → Article
+
+### Supported Sources
+
+| Type | Sources | Auto-Detect | Notes |
+|------|---------|-------------|-------|
+| **Video** | YouTube, Vimeo, local files | ✓ | Auto-fetches captions when available, otherwise transcribes |
+| **Podcast** | PocketCasts, Spotify, direct MP3 URLs | ✓ | Direct download and transcription |
+| **Audio** | Local `.mp3`, `.m4a`, `.wav`, `.aac`, `.flac` | ✓ | Transcribed with Whisper |
+| **Article** | Any web page/blog | ✓ | Extracts and analyzes text content |
+| **Transcript** | Local `.txt`, `.md` files | ✓ | Direct summarization |
 
 ## Configuration
 
@@ -166,6 +169,40 @@ Files are organized with consistent IDs:
 - Makes it easy to find related audio, transcript, and summary files
 
 ## Advanced Features
+
+### Article Processing
+
+Process articles and web content with article-specific analysis:
+
+```bash
+# Basic article processing
+podcast -t "https://www.example.com/article"
+
+# With custom requests
+podcast -t -p "summarize in bullet points" "https://blog.example.com/post"
+```
+
+Articles get a different analysis structure focused on:
+- Key arguments and evidence
+- Data and statistics
+- Actionable takeaways
+- Critical analysis
+- Connections to current trends
+
+### Custom Prompts
+
+Add specific requests to any summary:
+
+```bash
+# For podcasts
+podcast -p "extract 4 linkedin quotes" "https://youtube.com/watch?v=..."
+
+# For articles
+podcast -t -p "focus on implementation details" "https://blog.example.com"
+
+# Multiple requests
+podcast -p "get key metrics and create a twitter thread" "url"
+```
 
 ### Batch Processing
 

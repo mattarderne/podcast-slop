@@ -1,17 +1,4 @@
-# Podcast Summarizer Configuration Guide
-
-## 📝 Single Configuration File: `podcast_config.yaml`
-
-We've simplified configuration from 2 confusing files to 1 clear file!
-
-### Before (Confusing):
-- `config.yaml` - User settings
-- `prompts.yaml` - Also had user settings?? Plus prompts
-
-### After (Simple):
-- `podcast_config.yaml` - Everything in one place!
-
----
+# Content Summarizer Configuration Guide
 
 ## 🚀 Quick Setup
 
@@ -26,29 +13,33 @@ profile:
     - Your interests here
 
   goals:
-    - What you want from podcasts
+    - What you want from content
 
   context: |
     Brief description of what you're working on
 ```
 
-2. **Run a podcast:**
+2. **Process any content:**
 ```bash
-podcast https://podcast-url.com
+podcast https://youtube.com/watch?v=...  # Video
+podcast https://example.com/article      # Article
+podcast video.mp4                        # Local file
 ```
 
 That's it! Summaries are now personalized for you.
+
+The tool automatically detects whether you're processing a video, podcast, article, or local file and handles it appropriately.
 
 ---
 
 ## 📊 What Each Section Does
 
 ### Profile Section
-Controls how Claude understands YOU:
-- **role**: Changes entire sections (e.g., "Founder Insights" vs "Investor Insights")
-- **interests**: Prioritizes relevant content
+Controls how Claude understands YOU (works for all content types):
+- **role**: Changes section focus (e.g., "Founder Insights" for podcasts, "Actionable Takeaways" for articles)
+- **interests**: Prioritizes relevant content and insights
 - **goals**: Focuses on what you want to achieve
-- **context**: Provides background for better insights
+- **context**: Provides background for better personalized insights
 
 ### Preferences Section
 Controls output format:
